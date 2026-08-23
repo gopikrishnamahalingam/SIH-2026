@@ -1,22 +1,31 @@
-from pathlib import Path
-from dotenv import load_dotenv
 import os
-from supabase import create_client, Client
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-load_dotenv(BASE_DIR / ".env")
+load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not SUPABASE_URL:
-    raise ValueError("SUPABASE_URL is missing")
-
-if not SUPABASE_KEY:
-    raise ValueError("SUPABASE_KEY is missing")
-
-supabase: Client = create_client(
-    SUPABASE_URL,
-    SUPABASE_KEY
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True
 )
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
+Base = declarative_base()
+
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
