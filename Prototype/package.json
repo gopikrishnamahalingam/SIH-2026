@@ -1,0 +1,17 @@
+{
+  "name": "govstart-root",
+  "version": "1.0.0",
+  "description": "Smart India Hackathon 2026 GovStart Platform",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev": "npx -y concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "db:setup": "npm run db:setup --prefix backend",
+    "db:seed": "npm run db:seed --prefix backend"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

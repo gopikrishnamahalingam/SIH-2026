@@ -1,0 +1,304 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  GOVERNMENT
+  STARTUP
+  EXPERT
+  ADMIN
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  passwordHash      String
+  role              Role
+  name              String
+  createdAt         DateTime           @default(now())
+  startup           Startup?
+  challenges        Challenge[]
+  evaluations       Evaluation[]
+  validationReports ValidationReport[]
+  scaleDecisions    ScaleDecision[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  applications      Application[]
+}
+
+model Startup {
+  id                  String              @id @default(uuid())
+  userId              String              @unique
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  location            String
+  founded             Int
+  teamSize            Int
+  website             String
+  profileCompleteness Int                 @default(0)
+  logoUrl             String?
+  status              String              @default("APPROVED")
+  technologies        StartupTechnology[]
+  sectors             StartupSector[]
+  documents           StartupDocument[]
+  applications        Application[]
+  pilots              Pilot[]
+}
+
+model StartupTechnology {
+  id        String  @id @default(uuid())
+  startupId String
+  startup   Startup @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  name      String
+}
+
+model StartupSector {
+  id        String  @id @default(uuid())
+  startupId String
+  startup   Startup @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  name      String
+}
+
+model StartupDocument {
+  id          String  @id @default(uuid())
+  startupId   String
+  startup     Startup @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  name        String
+  documentUrl String
+  status      String  @default("PENDING") // PENDING, APPROVED, REJECTED
+}
+
+model Challenge {
+  id               String                   @id @default(uuid())
+  title            String
+  department       String
+  sector           String
+  location         String
+  description      String
+  currentSituation String
+  targetUsers      String
+  expectedImpact   String
+  pilotDuration    Int // in days
+  estimatedBudget  Decimal
+  status           String                   @default("DRAFT") // DRAFT, PUBLISHED, CLOSED
+  createdById      String
+  createdBy        User                     @relation(fields: [createdById], references: [id])
+  createdAt        DateTime                 @default(now())
+  requirements     EligibilityRequirement[]
+  criteria         EvaluationCriterion[]
+  kpis             ChallengeKPI[]
+  applications     Application[]
+  pilots           Pilot[]
+}
+
+model EligibilityRequirement {
+  id                 String              @id @default(uuid())
+  challengeId        String
+  challenge          Challenge           @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name               String
+  description        String
+  isRequired         Boolean             @default(true)
+  eligibilityResults EligibilityResult[]
+}
+
+model EvaluationCriterion {
+  id          String    @id @default(uuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name        String
+  weight      Decimal // e.g. 0.25 (for 25%)
+}
+
+model ChallengeKPI {
+  id          String    @id @default(uuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name        String
+  baseline    String
+  target      String
+  unit        String
+  frequency   String
+}
+
+model Application {
+  id                   String              @id @default(uuid())
+  appId                String?             @unique
+  challengeId          String
+  challenge            Challenge           @relation(fields: [challengeId], references: [id])
+  startupId            String
+  startup              Startup             @relation(fields: [startupId], references: [id])
+  userId               String?
+  user                 User?               @relation(fields: [userId], references: [id])
+  status               String              @default("SUBMITTED")
+  createdAt            DateTime            @default(now())
+  submittedAt          DateTime            @default(now())
+  
+  // Proposed Solution fields
+  solutionTitle        String?
+  problemUnderstanding String?
+  solutionDescription  String?
+  technologyUsed       String?
+  innovation           String?
+  expectedImpact       String?
+
+  // Pilot Plan fields
+  implementationApproach String?
+  pilotTimeline        Json?
+  resourceRequirements Json?
+  expectedKpiResults   Json?
+
+  // Documents
+  documents            Json?
+
+  eligibilityResults   EligibilityResult[]
+  evaluations          Evaluation[]
+  pilots               Pilot[]
+}
+
+model EligibilityResult {
+  id            String                 @id @default(uuid())
+  applicationId String
+  application   Application            @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requirementId String
+  requirement   EligibilityRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  status        String                 @default("PENDING") // PASS, WARNING, FAIL, PENDING
+  evidence      String?
+}
+
+model Evaluation {
+  id               String      @id @default(uuid())
+  applicationId    String
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  expertId         String
+  expert           User        @relation(fields: [expertId], references: [id])
+  techFeasibility  Int
+  innovation       Int
+  costEffectiveness Int
+  scalability      Int
+  security         Int
+  socialImpact     Int
+  score            Decimal
+  comments         String
+  createdAt        DateTime    @default(now())
+}
+
+model Pilot {
+  id                String             @id @default(uuid())
+  applicationId     String?
+  application       Application?       @relation(fields: [applicationId], references: [id])
+  challengeId       String
+  challenge         Challenge          @relation(fields: [challengeId], references: [id])
+  startupId         String
+  startup           Startup            @relation(fields: [startupId], references: [id])
+  status            String             @default("PLANNED") // PLANNED, ACTIVE, REVIEW, VALIDATION, COMPLETED
+  startDate         DateTime
+  endDate           DateTime
+  budget            Decimal
+  objectives        String
+  risks             String
+  dataAccess        String
+  ipTerms           String
+  cybersecurity     String
+  currentStage      String             @default("PLANNED") // PLANNED, ACTIVE, REVIEW, VALIDATION, COMPLETED
+  kpis              PilotKPI[]
+  milestones        Milestone[]
+  validationReports ValidationReport[]
+  scaleDecisions    ScaleDecision[]
+}
+
+model PilotKPI {
+  id                  String  @id @default(uuid())
+  pilotId             String
+  pilot               Pilot   @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+  name                String
+  baseline            String
+  target              String
+  current             String
+  unit                String
+  reductionPercentage Decimal @default(0)
+  status              String  @default("ON_TRACK") // ON_TRACK, ACHIEVED, BEHIND
+}
+
+model Milestone {
+  id              String    @id @default(uuid())
+  pilotId         String
+  pilot           Pilot     @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+  name            String
+  description     String
+  amount          Decimal
+  deadline        DateTime
+  successCriteria String
+  evidenceUrl     String?
+  status          String    @default("PENDING") // PENDING, UNDER_REVIEW, VERIFIED
+  paymentStatus   String    @default("UNPAID") // UNPAID, PROCESSING, PAID
+  payments        Payment[]
+}
+
+model Payment {
+  id          String    @id @default(uuid())
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  amount      Decimal
+  status      String    @default("PENDING") // PENDING, PAID
+  processedAt DateTime?
+}
+
+model ValidationReport {
+  id                String   @id @default(uuid())
+  pilotId           String
+  pilot             Pilot    @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+  startupClaim      String
+  systemResult      String
+  independentResult String
+  target            String
+  outcome           String   @default("VERIFIED") // VERIFIED, PARTIAL, FAILED
+  methodology       String
+  observations      String
+  documentUrl       String?
+  submittedAt       DateTime @default(now())
+  submittedById     String
+  submittedBy       User     @relation(fields: [submittedById], references: [id])
+}
+
+model ScaleDecision {
+  id            String   @id @default(uuid())
+  pilotId       String
+  pilot         Pilot    @relation(fields: [pilotId], references: [id], onDelete: Cascade)
+  decision      String // SCALE, EXTEND_PILOT, STOP
+  reason        String
+  proposedScope String?
+  decidedById   String
+  decidedBy     User     @relation(fields: [decidedById], references: [id])
+  decidedAt     DateTime @default(now())
+}
+
+model DocumentTemplate {
+  id          String @id @default(uuid())
+  title       String
+  description String
+  content     String
+  category    String
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  details        String
+  performedById  String?
+  performedBy    User?    @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+}
